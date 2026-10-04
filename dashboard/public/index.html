@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sentinel — Network Security Observatory</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root {
+    --bg-deep: #060a17;
+    --bg-panel: #0d1326;
+    --line-dim: #1c2440;
+    --text-main: #e6ebf5;
+    --text-dim: #6b7591;
+    --accent-cyan: #4fd1c5;
+    --risk-low: #4fd1c5;
+    --risk-medium: #f5b942;
+    --risk-high: #f2793c;
+    --risk-critical: #ef4a5f;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg-deep);
+    color: var(--text-main);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+
+  #stars {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 120px 80px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 220px 160px, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 320px 40px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 400px 220px, rgba(255,255,255,0.4), transparent);
+    background-repeat: repeat;
+    background-size: 480px 320px;
+    opacity: 0.5;
+  }
+
+  header {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 20px 28px 14px;
+    border-bottom: 1px solid var(--line-dim);
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .brand h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .brand .tag {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  #status {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pulse-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px var(--accent-cyan);
+    animation: pulse 2s infinite ease-in-out;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    height: calc(100% - 65px);
+  }
+
+  #graph-container {
+    position: relative;
+    overflow: hidden;
+  }
+
+  #legend {
+    position: absolute;
+    bottom: 20px;
+    left: 24px;
+    display: flex;
+    gap: 18px;
+    font-size: 11px;
+    color: var(--text-dim);
+    z-index: 3;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+  aside {
+    border-left: 1px solid var(--line-dim);
+    background: var(--bg-panel);
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  aside h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+  }
+
+  #detail-empty {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .detail-card { display: none; }
+  .detail-card.active { display: block; }
+
+  .detail-name {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    word-break: break-all;
+  }
+
+  .detail-type {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+  }
+
+  .risk-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+
+  .finding {
+    border-left: 2px solid var(--line-dim);
+    padding: 8px 0 8px 12px;
+    margin-bottom: 10px;
+  }
+
+  .finding.critical { border-color: var(--risk-critical); }
+  .finding.high { border-color: var(--risk-high); }
+  .finding.medium { border-color: var(--risk-medium); }
+  .finding.low { border-color: var(--risk-low); }
+
+  .finding-issue { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .finding-detail { font-size: 12px; color: var(--text-dim); line-height: 1.45; }
+
+  #summary-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .stat-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--line-dim);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+
+  .stat-value { font-size: 20px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .node circle { cursor: pointer; }
+  .node text {
+    fill: var(--text-dim);
+    font-size: 10px;
+    pointer-events: none;
+  }
+  .link { stroke: var(--line-dim); stroke-width: 1; }
+</style>
+</head>
+<body>
+<div id="stars"></div>
+
+<header>
+  <div class="brand">
+    <h1>Sentinel</h1>
+    <span class="tag">Network Security Observatory</span>
+  </div>
+  <div id="status"><span class="pulse-dot"></span><span id="status-text">Connecting…</span></div>
+</header>
+
+<main>
+  <div id="graph-container">
+    <svg id="graph" width="100%" height="100%"></svg>
+    <div id="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:var(--risk-low)"></span>Low</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--risk-medium)"></span>Medium</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--risk-high)"></span>High</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--risk-critical)"></span>Critical</div>
+    </div>
+  </div>
+
+  <aside>
+    <h2>Overview</h2>
+    <div id="summary-stats">
+      <div class="stat-box"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Assets</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-critical">0</div><div class="stat-label">Critical</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-lastscan">—</div><div class="stat-label">Last Scan</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-highest">—</div><div class="stat-label">Top Risk</div></div>
+    </div>
+
+    <h2>Asset Detail</h2>
+    <div id="detail-empty">Click a node on the map to inspect its risk findings.</div>
+    <div class="detail-card" id="detail-card">
+      <div class="detail-name" id="detail-name"></div>
+      <div class="detail-type" id="detail-type"></div>
+      <div class="risk-badge" id="detail-badge"></div>
+      <div id="detail-findings"></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const riskColor = {
+  low: 'var(--risk-low)',
+  medium: 'var(--risk-medium)',
+  high: 'var(--risk-high)',
+  critical: 'var(--risk-critical)',
+};
+const riskColorHex = { low: '#4fd1c5', medium: '#f5b942', high: '#f2793c', critical: '#ef4a5f' };
+
+const svg = d3.select('#graph');
+const container = document.getElementById('graph-container');
+let width = container.clientWidth, height = container.clientHeight;
+svg.attr('viewBox', [0, 0, width, height]);
+
+const g = svg.append('g');
+svg.call(d3.zoom().scaleExtent([0.4, 3]).on('zoom', (e) => g.attr('transform', e.transform)));
+
+let simulation = d3.forceSimulation()
+  .force('charge', d3.forceManyBody().strength(-220))
+  .force('center', d3.forceCenter(width / 2, height / 2))
+  .force('collision', d3.forceCollide().radius(38));
+
+let linkSel, nodeSel;
+const centerNode = { id: '__core__', name: 'SENTINEL', isCore: true };
+
+function render(assets) {
+  const nodes = [centerNode, ...assets.map(a => ({ ...a, id: 'asset-' + a.id }))];
+  const links = assets.map(a => ({ source: '__core__', target: 'asset-' + a.id }));
+
+  g.selectAll('*').remove();
+
+  linkSel = g.append('g').selectAll('line')
+    .data(links)
+    .join('line')
+    .attr('class', 'link');
+
+  nodeSel = g.append('g').selectAll('g.node')
+    .data(nodes)
+    .join('g')
+    .attr('class', 'node')
+    .call(drag(simulation));
+
+  nodeSel.append('circle')
+    .attr('r', d => d.isCore ? 26 : 16)
+    .attr('fill', d => d.isCore ? '#0d1326' : (riskColorHex[d.risk_level] || '#4fd1c5'))
+    .attr('stroke', d => d.isCore ? 'var(--accent-cyan)' : 'none')
+    .attr('stroke-width', d => d.isCore ? 2 : 0)
+    .style('filter', d => d.isCore ? 'drop-shadow(0 0 10px rgba(79,209,197,0.6))' : `drop-shadow(0 0 8px ${riskColorHex[d.risk_level] || '#4fd1c5'})`)
+    .on('click', (event, d) => { if (!d.isCore) showDetail(d); });
+
+  nodeSel.filter(d => !d.isCore).append('circle')
+    .attr('r', 16)
+    .attr('fill', 'none')
+    .attr('stroke', d => riskColorHex[d.risk_level] || '#4fd1c5')
+    .attr('stroke-width', 1.5)
+    .attr('opacity', 0.6)
+    .style('animation', 'pulse 2.4s infinite ease-in-out');
+
+  nodeSel.append('text')
+    .attr('dy', d => d.isCore ? 42 : 30)
+    .attr('text-anchor', 'middle')
+    .text(d => d.isCore ? 'CORE' : (d.name.length > 20 ? d.name.slice(0, 18) + '…' : d.name));
+
+  simulation.nodes(nodes).on('tick', ticked);
+  simulation.force('link', d3.forceLink(links).id(d => d.id).distance(140));
+  simulation.force('center', d3.forceCenter(width / 2, height / 2));
+  simulation.alpha(1).restart();
+
+  function ticked() {
+    linkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  }
+
+  updateStats(assets);
+}
+
+function drag(sim) {
+  function started(event, d) {
+    if (!event.active) sim.alphaTarget(0.3).restart();
+    d.fx = d.x; d.fy = d.y;
+  }
+  function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+  function ended(event, d) {
+    if (!event.active) sim.alphaTarget(0);
+    d.fx = null; d.fy = null;
+  }
+  return d3.drag().on('start', started).on('drag', dragged).on('end', ended);
+}
+
+function updateStats(assets) {
+  document.getElementById('stat-total').textContent = assets.length;
+  document.getElementById('stat-critical').textContent = assets.filter(a => a.risk_level === 'critical').length;
+  const latest = assets.map(a => a.scanned_at).filter(Boolean).sort().reverse()[0];
+  document.getElementById('stat-lastscan').textContent = latest ? new Date(latest).toLocaleTimeString() : '—';
+  const order = { critical: 3, high: 2, medium: 1, low: 0 };
+  const top = assets.reduce((acc, a) => (order[a.risk_level] > order[acc?.risk_level || 'low'] ? a : acc), null);
+  document.getElementById('stat-highest').textContent = top ? top.name.slice(0, 14) : '—';
+}
+
+function showDetail(d) {
+  document.getElementById('detail-empty').style.display = 'none';
+  const card = document.getElementById('detail-card');
+  card.classList.add('active');
+  document.getElementById('detail-name').textContent = d.name;
+  document.getElementById('detail-type').textContent = d.type + (d.ip_address ? ' · ' + d.ip_address : '');
+  const badge = document.getElementById('detail-badge');
+  badge.textContent = (d.risk_level || 'low') + ' risk — score ' + (d.risk_score ?? 0);
+  badge.style.background = (riskColorHex[d.risk_level] || '#4fd1c5') + '22';
+  badge.style.color = riskColorHex[d.risk_level] || '#4fd1c5';
+
+  const findingsEl = document.getElementById('detail-findings');
+  findingsEl.innerHTML = '';
+  (d.findings || []).forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'finding ' + f.severity;
+    div.innerHTML = `<div class="finding-issue">${f.issue}</div><div class="finding-detail">${f.detail}</div>`;
+    findingsEl.appendChild(div);
+  });
+}
+
+// --- WebSocket real-time connection ---
+const statusText = document.getElementById('status-text');
+const ws = new WebSocket(`ws://${location.host}`);
+
+ws.onopen = () => { statusText.textContent = 'Live — monitoring'; };
+ws.onclose = () => { statusText.textContent = 'Disconnected'; };
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  if (msg.type === 'snapshot') render(msg.data);
+};
+
+window.addEventListener('resize', () => {
+  width = container.clientWidth; height = container.clientHeight;
+  svg.attr('viewBox', [0, 0, width, height]);
+  simulation.force('center', d3.forceCenter(width / 2, height / 2));
+  simulation.alpha(0.5).restart();
+});
+</script>
+</body>
+</html>
