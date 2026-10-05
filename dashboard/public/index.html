@@ -210,6 +210,21 @@
     pointer-events: none;
   }
   .link { stroke: var(--line-dim); stroke-width: 1; }
+
+  .header-right { display: flex; align-items: center; gap: 18px; }
+  .report-actions { display: flex; gap: 8px; }
+  .report-btn {
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 4px 12px;
+    border: 1px solid var(--accent-cyan);
+    border-radius: 5px;
+    color: var(--accent-cyan);
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    transition: background 0.15s, color 0.15s;
+  }
+  .report-btn:hover { background: var(--accent-cyan); color: var(--bg-deep); }
 </style>
 </head>
 <body>
@@ -220,7 +235,13 @@
     <h1>Sentinel</h1>
     <span class="tag">Network Security Observatory</span>
   </div>
-  <div id="status"><span class="pulse-dot"></span><span id="status-text">Connecting…</span></div>
+  <div class="header-right">
+    <div class="report-actions">
+      <a class="report-btn" href="/report" target="_blank" rel="noopener">View report</a>
+      <a class="report-btn" href="/report?download=1">Download report</a>
+    </div>
+    <div id="status"><span class="pulse-dot"></span><span id="status-text">Connecting…</span></div>
+  </div>
 </header>
 
 <main>
@@ -371,7 +392,14 @@ function showDetail(d) {
   (d.findings || []).forEach(f => {
     const div = document.createElement('div');
     div.className = 'finding ' + f.severity;
-    div.innerHTML = `<div class="finding-issue">${f.issue}</div><div class="finding-detail">${f.detail}</div>`;
+    const issueEl = document.createElement('div');
+    issueEl.className = 'finding-issue';
+    issueEl.textContent = f.issue;
+    const detailEl = document.createElement('div');
+    detailEl.className = 'finding-detail';
+    detailEl.textContent = f.detail;
+    div.appendChild(issueEl);
+    div.appendChild(detailEl);
     findingsEl.appendChild(div);
   });
 }
