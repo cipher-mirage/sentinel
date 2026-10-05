@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node start.js",
     "start:target": "node target-api/server.js",
     "start:dashboard": "node dashboard/server.js",
     "scan:once": "node -e \"require('./scanner/scanner').runFullScan().then(r=>console.log(JSON.stringify(r,null,2)))\""

@@ -62,17 +62,12 @@ cd sentinel
 npm install
 ```
 
-Open **two terminal windows**.
-
-**Terminal 1: start the target API (the thing being scanned):**
+Start everything with one command:
 ```bash
-npm run start:target
+npm start
 ```
 
-**Terminal 2: start the dashboard (scans and visualises):**
-```bash
-npm run start:dashboard
-```
+Or run the two parts separately in two terminals: `npm run start:target` and `npm run start:dashboard`.
 
 Then open **http://localhost:5000** in your browser. Within a couple of seconds the map fills in. Click any node to see its findings. It re-scans every 20 seconds, so you can leave it running and watch it update.
 
