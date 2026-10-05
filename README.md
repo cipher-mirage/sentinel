@@ -16,6 +16,7 @@ Sentinel grew out of an IT Asset Management database prototype I built during my
 - **Live updates**: the dashboard re-scans every 20 seconds and pushes results to the browser over WebSocket, with no page refresh
 - **Constellation map**: a D3.js force-directed graph where colour shows risk level and clicking a node shows exactly what was found and why
 - **Scan history**: stored in SQLite so nothing is lost between runs
+- **Security report**: one click produces a printable report with every finding and a plain-language fix (use the buttons on the dashboard, or open `/report`)
 
 ## Tech Stack
 
@@ -35,6 +36,8 @@ sentinel/
 ├── dashboard/         Live dashboard (web server + frontend)
 │   ├── server.js
 │   └── public/index.html
+├── report.js          Builds the security report (HTML, printable to PDF)
+├── start.js           Starts the target API and dashboard together
 └── package.json
 ```
 
@@ -51,6 +54,8 @@ sentinel/
 3. **`db/`**: stores assets and their scan history. It uses the same relational design as the original IT Asset Management prototype, extended with a `scans` table for history.
 
 4. **`dashboard/`**: a web server that re-scans automatically and pushes updates instantly to the browser over WebSocket. The frontend draws each asset as a node on a force-directed map.
+
+5. **`report.js`**: turns the latest scan into a clean report with a summary, a table of assets, and a plain-language fix for every finding.
 
 ## Getting Started
 
@@ -76,11 +81,20 @@ To run a single scan and print the raw JSON:
 npm run scan:once
 ```
 
+## Security Report
+
+Click **View report** or **Download report** at the top of the dashboard, or open `http://localhost:5000/report`. Use the **Print / Save as PDF** button on the report page to make a PDF.
+
+You can put names on the report with the address, for example:
+```
+http://localhost:5000/report?for=Client%20Name&by=Your%20Name
+```
+
 ## Known Limitations / Next Steps
 
 - Device discovery is simulated; next step is real network discovery
 - The graph sits off-centre and long URLs are cut off in the "Top risk" card
-- Add more vulnerability rules and exportable reports
+- Add more vulnerability rules and a one-click PDF export
 
 ## Responsible Use
 
@@ -89,4 +103,5 @@ Only scan systems you own or have written permission to test. The bundled target
 ## Author
 
 Adrian, Diploma in Computer Science, The Nairobi National Polytechnic (2026)
-Contact: GitHub: [@cipher-mirage](https://github.com/cipher-mirage)
+
+GitHub: [@cipher-mirage](https://github.com/cipher-mirage)
