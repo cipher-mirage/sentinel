@@ -82,9 +82,15 @@ function analyzeSchema(schema) {
   });
   score += 25;
 
+  // Mutation fields are judged separately below (as "dangerous mutations"),
+  // and built-in "__" introspection types are not the API's own data, so
+  // neither should be reported again as "sensitive fields".
+  const mutationRootName = schema.mutationType?.name;
+
   const allFields = [];
   for (const type of schema.types || []) {
     if (!type.fields) continue;
+    if (type.name.startsWith("__") || type.name === mutationRootName) continue;
     for (const field of type.fields) {
       allFields.push({ typeName: type.name, fieldName: field.name });
     }
