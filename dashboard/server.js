@@ -16,6 +16,7 @@ const WebSocket = require("ws");
 
 const { runFullScan } = require("../scanner/scanner");
 const { getLatestSnapshot } = require("../db/db");
+const { buildReport } = require("../report");
 
 const app = express();
 const server = http.createServer(app);
@@ -32,6 +33,45 @@ app.get("/api/snapshot", (req, res) => {
 app.post("/api/scan", async (req, res) => {
   await performScanAndBroadcast();
   res.json({ ok: true });
+});
+
+// --- Security report -------------------------------------------------------
+// Turns whatever getLatestSnapshot() returns into the shape report.js expects:
+// { name, type, score, level, findings: [{ severity, issue, detail }] }
+// It accepts either score/level or risk_score/risk_level, and findings stored
+// as an array or as a JSON string.
+function normalizeAsset(row) {
+  let findings = row.findings;
+  if (typeof findings === "string") {
+    try {
+      findings = JSON.parse(findings);
+    } catch (e) {
+      findings = [];
+    }
+  }
+  return {
+    name: row.name || row.endpoint || row.ip_address || "Unknown asset",
+    type: row.type === "api" ? "api" : "device",
+    score: Number(row.score ?? row.risk_score ?? 0),
+    level: row.level ?? row.risk_level ?? "low",
+    findings: Array.isArray(findings) ? findings : [],
+  };
+}
+
+// Open /report in the browser to view it, or /report?download=1 to save it as a file.
+// Optional: /report?for=Client%20Name&by=Your%20Name
+app.get("/report", (req, res) => {
+  const snapshot = getLatestSnapshot() || [];
+  const results = snapshot.map(normalizeAsset);
+  const html = buildReport(results, {
+    preparedFor: req.query.for ? String(req.query.for).slice(0, 80) : "",
+    preparedBy: req.query.by ? String(req.query.by).slice(0, 80) : "",
+  });
+  res.set("Content-Type", "text/html; charset=utf-8");
+  if (req.query.download) {
+    res.set("Content-Disposition", 'attachment; filename="sentinel-report.html"');
+  }
+  res.send(html);
 });
 
 function broadcast(data) {
